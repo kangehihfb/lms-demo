@@ -1,0 +1,94 @@
+# 밀당 LMS · React 데모
+
+`lms-board-proto` HTML 프로토타입을 Vite + React 19 데모로 옮긴 것입니다.
+원본의 Windows 11 데스크탑 메타포, CSS 토큰, 레이아웃 수치를 그대로 쓰고
+화면은 실제 React DOM으로 렌더합니다.
+
+**로컬 데모입니다.** 실제 학생 서비스나 외부 메시지 발송과 연결되어 있지 않고,
+상태는 브라우저 `localStorage`에만 저장됩니다.
+
+## 실행
+
+```bash
+npm install
+npm run dev        # http://127.0.0.1:5173
+```
+
+개발 서버가 무거우면 빌드된 결과물을 서빙하는 쪽이 훨씬 가볍습니다.
+
+```bash
+npm run build && npm run preview   # http://127.0.0.1:4173
+```
+
+| 명령 | 용도 |
+|---|---|
+| `npm run dev` | 개발 서버 (HMR) |
+| `npm run build` | 프로덕션 빌드 → `dist/` |
+| `npm run preview` | 빌드 결과물 서빙 |
+| `npm test` | 로직 테스트 |
+| `node scripts/qa.mjs` | 원본 대조 스크린샷 + 콘솔 에러 수집 (`evidence/`) |
+
+리렌더 하이라이트(React Scan)는 기본으로 꺼져 있습니다. 보려면:
+
+```bash
+VITE_REACT_DEVTOOLS=1 npm run dev
+```
+
+## 배포
+
+정적 사이트라 별도 설정이 거의 없습니다. 라우팅이 해시 기반(`#/board`)이라
+SPA rewrite 규칙도 필요 없습니다.
+
+Vercel은 이 저장소를 Import하면 `vercel.json`의 설정을 그대로 씁니다.
+
+| 항목 | 값 |
+|---|---|
+| Framework | Vite |
+| Build Command | `npm run build` |
+| Output Directory | `dist` |
+
+## 단축키
+
+| 키 | 동작 |
+|---|---|
+| `N` | 다음 확인 필요 학생 |
+| `↑` `↓` | 보드에서 확인 필요 학생 이동 · 학생 상세에서 옆 학생 |
+| `Enter` | 학생 열기 |
+| `C` | 선택한 학생 빠른 답장 |
+| `←` `→` | 문항 이동 |
+| `F` | 학생 화면 따라가기 |
+| `Ctrl/⌘ + K` | 학생 · 명령 검색 |
+| `Ctrl/⌘ + B` | 탐색 창 |
+| `Ctrl/⌘ + W` | 앞에 있는 창 닫기 |
+| `Ctrl/⌘ + Shift + M` | 미니 창 |
+| `Ctrl/⌘ + 1` `2` | 지금 수업 / 오늘 전체 |
+| `Ctrl/⌘ + ,` | 설정 |
+| `Alt + 1~9` | 학생 탭 이동 |
+| `Alt + T` | 주간 · 야간 |
+
+## 창 조작
+
+보드 · 학생 상세 · 설정 창은 제목 표시줄로 끌고, 우하단 그립으로 크기를 바꾸고,
+제목 표시줄 더블클릭으로 최대화합니다. 클릭한 창이 앞으로 옵니다.
+학생은 우클릭 → **새 창으로 열기**로 독립 창에 여러 개 띄울 수 있습니다.
+
+## 빠른 답장
+
+보드 카드를 누르면 옆에 작은 채팅 팝오버가 열립니다. 다시 누르면 닫힙니다.
+💬 배지나 `C` 키, 우클릭 메뉴로도 열립니다.
+
+## 구조
+
+| 경로 | 내용 |
+|---|---|
+| `src/App.jsx` | 셸, 창 배치, 메뉴, 단축키 |
+| `src/Board.jsx` | 학생 보드 (카드 · 표) |
+| `src/StudentWorkspace.jsx` | 학생 상세 (탭 방식) + 공용 화면·채팅 조각 |
+| `src/StudentWindow.jsx` | 독립 학생 창 |
+| `src/QuickChat.jsx` | 카드 옆 빠른 답장 팝오버 |
+| `src/windowing.js` | 창 끌기 · 크기 조절 · 앞뒤 순서 |
+| `src/Management.jsx` | 학생 · 일정 · 그룹 · 리포트 · 운영 |
+| `src/model.js` | 상태 리듀서, 정렬·집계 규칙 |
+| `src/data.js` | 고정 데모 데이터 (2026-09-28 20:41 기준) |
+| `src/reference.css` | 원본에서 가져온 CSS |
+| `DESIGN.md` | 디자인 결정과 검증 범위 |

@@ -95,3 +95,6 @@ button{text-align:inherit}
 .srow .chatn{cursor:pointer}
 .srow.qopen{box-shadow:inset 0 0 0 1.5px var(--accent)}
 @media(prefers-reduced-motion:reduce){.qchat{animation:none}}
+
+/* 처리 대기 목록은 잘라내지 말고 넘치면 스크롤한다 */
+.mini-l{max-height:232px;overflow-y:auto}
