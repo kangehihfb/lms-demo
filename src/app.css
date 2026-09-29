@@ -66,7 +66,6 @@ button{text-align:inherit}
 .windows-mark{display:grid;grid-template-columns:repeat(2,8px);grid-template-rows:repeat(2,8px);gap:2px}.windows-mark i{background:#1f7ae0;border-radius:1px}
 .browser-mark{position:relative}.browser-mark:before{content:'';width:22px;height:22px;border-radius:50%;background:conic-gradient(#e8453c 0 33%,#f9bc15 33% 66%,#2da94f 66%)}.browser-mark i{position:absolute;width:10px;height:10px;border:1.5px solid white;border-radius:50%;background:#1a73e8}
 .messenger-mark{background:#fee500;color:#3c1e1e;display:grid;place-items:center;width:23px;height:23px;border-radius:5px}
-.desktop-welcome{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;color:white;gap:10px}.desktop-welcome .tk-app{width:64px;height:64px;font-size:38px;border-radius:14px}
 .toast{position:fixed;left:50%;bottom:64px;transform:translateX(-50%);z-index:400;padding:10px 16px;border-radius:6px;background:var(--tx);color:var(--surface);box-shadow:var(--shadow-win-in);max-width:90vw;word-break:keep-all}
 [data-density="wide"] .srow{padding-top:13px;padding-bottom:14px}[data-density="compact"] .srow{padding-top:4px;padding-bottom:4px}
 [data-font-size="large"] .srow .nm{font-size:15px}[data-font-size="large"] .srow .unit{font-size:14px}[data-font-size="small"] .srow .nm{font-size:12px}
@@ -102,3 +101,6 @@ button{text-align:inherit}
 /* 알림 토스트는 flex 아이템으로 눌리면 안 되고,
    슬라이드인용 .in 클래스가 무관한 .in{height:28px} 규칙과 겹쳐 높이가 잘린다. */
 .notifs .nt{flex:none;height:auto}
+
+/* 원본에서 누락된 학생 실시간 커서 */
+.paper .cursor{position:absolute; width:10px; height:10px; border-radius:50%; background:rgba(45,84,139,.35); box-shadow:0 0 0 3px rgba(45,84,139,.15)}

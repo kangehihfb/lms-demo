@@ -11,7 +11,7 @@ export function Paper({ student: s, question, explanation = 'always' }) {
   const current = question === s.cur && s.st === 'live';
   const answer = (question * 3) % 5;
   const pick = wrong ? (answer + 2) % 5 : answer;
-  return <div className="paper"><div className="unit">{s.unit}</div><div className="qn">문항 {question}</div><div className="qt">{(isMath ? QM : QE)[(question - 1) % 10]}</div><div className="ch">{(isMath ? CH_M : CH_E).map((choice, i) => <div key={choice} className={`${(done || current && question % 2 === 1) && i === pick ? `pick${wrong ? ' wr' : ''}` : ''} ${done && wrong && i === answer ? 'ans' : ''}`}><b/>{choice}</div>)}</div><div className="work">{(done || current) && <svg viewBox="0 0 560 120" fill="none" stroke="var(--accent)" strokeWidth="2.2" strokeLinecap="round" aria-label="학생 풀이 필기 예시" role="img">{INK.slice(0, current ? 2 + s.cur % 3 : 4).map(path => <path key={path} d={path}/>)}</svg>}<span className="lbl">학생 필기{current ? ' · 실시간 데모' : ''}</span></div>{done && (explanation === 'always' || explanation === 'correct' && !wrong) && <div className="expl"><b>해설</b> · {isMath ? '완전제곱식으로 바꾸면 꼭짓점에서 최댓값을 가집니다.' : '선행사와 문장 안에서의 역할을 확인하여 알맞은 관계사를 고릅니다.'}</div>}</div>;
+  return <div className="paper"><div className="unit">{s.unit}</div><div className="qn">문항 {question}</div><div className="qt">{(isMath ? QM : QE)[(question - 1) % 10]}</div><div className="ch">{(isMath ? CH_M : CH_E).map((choice, i) => <div key={choice} className={`${(done || current && question % 2 === 1) && i === pick ? `pick${wrong ? ' wr' : ''}` : ''} ${done && wrong && i === answer ? 'ans' : ''}`}><b/>{choice}</div>)}</div><div className="work">{(done || current) && <svg viewBox="0 0 560 120" fill="none" stroke="var(--accent)" strokeWidth="2.2" strokeLinecap="round" aria-label="학생 풀이 필기 예시" role="img">{INK.slice(0, current ? 2 + s.cur % 3 : 4).map(path => <path key={path} d={path}/>)}</svg>}<span className="lbl">학생 필기{current ? ' · 실시간 데모' : ''}</span></div>{done && (explanation === 'always' || explanation === 'correct' && !wrong) && <div className="expl"><b>해설</b> · {isMath ? '완전제곱식으로 바꾸면 꼭짓점에서 최댓값을 가집니다.' : '선행사와 문장 안에서의 역할을 확인하여 알맞은 관계사를 고릅니다.'}</div>}{current && <span className="cursor" style={{ left: 120 + (s.cur * 37) % 300, top: 250 + (s.cur * 13) % 60 }} aria-hidden="true"/>}</div>;
 }
 
 export function Chat({ student: s, onSend, onImage }) {
@@ -42,7 +42,7 @@ export function Composer({ student: s, draft, setDraft, onSend, placeholder = '�
 }
 
 
-export default function StudentWorkspace({ state, dispatch, tabs, active, onOpen, onCloseTab, onClose, onBack, onMinimize, onAction, notify, onCopy, arrange, setMode, keysActive = true, win }) {
+export default function StudentWorkspace({ state, dispatch, tabs, active, onOpen, onCloseTab, onClose, onBack, onMinimize, onAction, notify, onCopy, onMenu, arrange, setMode, keysActive = true, win }) {
   const ref = useRef(null);
   const { narrow, xnarrow } = useNarrow(ref, 1100, 860);
   const s = state.students.find(student => student.id === active);
@@ -50,23 +50,23 @@ export default function StudentWorkspace({ state, dispatch, tabs, active, onOpen
   const [side, setSide] = useState('chat');
   const [explanation, setExplanation] = useState('always');
   const q = question ?? (s.cur || 1);
-  useQuestionKeys(s, q, setQuestion, keysActive);
+  useQuestionKeys(s, q, setQuestion, keysActive, () => onCopy(`https://lms.mildang.kr/student/${s.id}?q=${q}`));
   return <section ref={ref} className={`win topw stuw student-window ${win.maximized ? 'max' : ''} ${narrow ? 'narrow' : ''} ${xnarrow ? 'xnarrow' : ''} ${win.active ? '' : 'inactive'}`} style={{ ...win.style, zIndex: win.z }} onPointerDown={win.onFocus} aria-label={`학생 상세 ${s.name}`}>
     <WindowTitle title={`학생 상세 · ${s.name} (${s.cls}반) - 밀당 LMS`} {...win.titleProps} onMinimize={onMinimize} onMaximize={win.toggleMax} onClose={onClose}/>
     <div className="workspace" style={{ display: 'flex' }}><div className="ws-tabs"><button className="backbtn" onClick={onBack}><Icon name="prev"/>보드</button>{tabs.map((id, i) => { const student = state.students.find(x => x.id === id); const a = topAlert(state.alerts, id); return <div className={`wtab ${active === id ? 'on' : ''}`} key={id}><button className="wtab-select" onClick={() => onOpen(id)}>{a && !a.waitAt ? <SeverityIcon severity={a.sev}/> : <span className={`dotn ${student.st === 'live' ? 'on' : ''}`}/>}<span className="nm">{student.name}</span><span className="k">Alt+{i + 1}</span></button><button className="x" aria-label={`${student.name} 탭 닫기`} onClick={() => onCloseTab(id)}>×</button></div>; })}<span className="sp"/><SelectField label="창 배치" value={arrange} onChange={setMode} options={ [['split-view', '나란히'], ['maximized', '최대화'], ['floating', '작게']] }/></div>
     <div className="ws-body"><aside className="ws-rail">{Object.keys(CLS).map(cls => <div key={cls}><div className="rh"><b>{cls}반</b>{CLS[cls].range}</div>{state.students.filter(x => x.cls === cls).map(x => { const a = topAlert(state.alerts, x.id); return <button className={`rr ${x.id === active ? 'sel' : ''} ${a && !a.waitAt ? `s-${a.sev}` : ''}`} key={x.id} onClick={() => onOpen(x.id)}>{a ? <SeverityIcon severity={a.sev}/> : <span className={`dotn ${x.st === 'live' ? 'on' : ''}`}/>}<span className="nm">{x.name}<em>{tagFor(x, a)}</em></span><span className="el">{x.cur}/{x.total}</span></button>; })}</div>)}</aside>
-    <StudentScreen student={s} alerts={state.alerts} q={q} setQuestion={setQuestion} explanation={explanation} setExplanation={setExplanation} dispatch={dispatch} notify={notify} onAction={onAction} onCopy={onCopy}/>
+    <StudentScreen student={s} alerts={state.alerts} q={q} setQuestion={setQuestion} explanation={explanation} setExplanation={setExplanation} dispatch={dispatch} notify={notify} onAction={onAction} onCopy={onCopy} onMenu={onMenu}/>
     <StudentSide student={s} side={side} setSide={setSide} dispatch={dispatch} notify={notify} onAction={onAction}/></div>
     <StudentFoot student={s} onAction={onAction}/></div><div className="statusbar"><span className="route-code">/student/{s.id}?tab={side}</span><span className="sp"/><span>← → 문항 · F 따라가기</span></div>
     {!win.maximized && <div className="rs" {...win.resizeProps} role="presentation"/>}
   </section>;
 }
 
-export function StudentScreen({ student: s, alerts, q, setQuestion, explanation, setExplanation, dispatch, notify, onAction, onCopy }) {
+export function StudentScreen({ student: s, alerts, q, setQuestion, explanation, setExplanation, dispatch, notify, onAction, onCopy, onMenu }) {
   const hasScreen = !['pre', 'offline', 'absent'].includes(s.st);
   const following = q === s.cur;
   const mine = sortedAlerts(alerts.filter(a => a.sid === s.id && a.kind !== 'chat'));
-  return <div className="sw-screen"><div className="ss-bar"><span className={`ss-live ${s.st === 'live' && following ? '' : 'off'}`}><span className="gdot"/>{s.st === 'live' ? following ? '실시간 데모' : '다른 문항 보는 중' : '기록'}</span>{hasScreen && <span className="ss-q">{q}번<span>/ {s.total} · {elapsed(s)}</span></span>}<span className="sp"/>{hasScreen && <><IconButton title="이전 문항" icon="prev" disabled={q <= 1} onClick={() => setQuestion(q - 1)}/><IconButton title="다음 문항" icon="next" disabled={q >= s.total} onClick={() => setQuestion(q + 1)}/><SelectField label="해설" value={explanation} onChange={setExplanation} options={ [['always', '항상'], ['correct', '정답일 때'], ['none', '숨김']] }/></>}</div>
+  return <div className="sw-screen"><div className="ss-bar"><span className={`ss-live ${s.st === 'live' && following ? '' : 'off'}`}><span className="gdot"/>{s.st === 'live' ? following ? '실시간 데모' : '다른 문항 보는 중' : '기록'}</span>{hasScreen && <span className="ss-q">{q}번<span>/ {s.total} · {elapsed(s)}</span></span>}<span className="sp"/>{hasScreen && <><IconButton title="이전 문항" icon="prev" disabled={q <= 1} onClick={() => setQuestion(q - 1)}/><IconButton title="다음 문항" icon="next" disabled={q >= s.total} onClick={() => setQuestion(q + 1)}/><button className="ibtn" aria-haspopup="menu" title="해설 · 정답 노출 방식" onClick={e => { const r = e.currentTarget.getBoundingClientRect(); onMenu({ x: r.left, y: r.bottom + 3, items: [{ label: '해설 · 정답 노출', heading: true }, ...[['always', '항상 보여주기'], ['correct', '정답일 때만'], ['none', '숨기기']].map(([value, label]) => ({ label, checked: explanation === value, run: () => setExplanation(value) })), '-', { label: '이 문항만 적용', checked: true }, { label: '유닛 전체에 적용' }] }); }}>해설 · {{ always: '항상', correct: '정답일 때', none: '숨김' }[explanation]} ▾</button><span className="ss-sep"/><button className="ibtn" title="학습 화면 링크 복사 (S)" onClick={() => onCopy(`https://lms.mildang.kr/student/${s.id}?q=${q}`)}>링크 복사</button></>}</div>
     {mine.map(a => <div className={`ss-banner ${a.waitAt ? 'waiting' : a.sev}`} key={a.id}><SeverityIcon severity={a.sev}/><span>{a.text}{a.waitAt && ` · 20:41 ${WAIT[a.kind] || '응대함'}`}</span></div>)}
     {hasScreen && !following && <div className="ss-banner follow"><span>지금 <b>{q}번</b>을 보고 있어요. 학생은 <b>{s.cur}번</b>에 있습니다.</span><span className="sp"/>{s.st === 'live' && <Button onClick={() => { dispatch({ type: 'student', id: s.id, patch: { cur: q } }); setQuestion(null); notify(`${q}번 문항으로 이동했습니다`); }}>학생을 {q}번으로 이동</Button>}<Button onClick={() => setQuestion(null)}>따라가기</Button></div>}
     <div className="ss-stage">{hasScreen ? <Paper student={s} question={q} explanation={explanation}/> : <div className="stage-empty"><b>{s.st === 'pre' ? '수업 전입니다' : s.st === 'absent' ? '결석 처리된 학생입니다' : '학생이 접속하지 않았습니다'}</b>{s.st === 'pre' ? `${s.cls}에 시작해요 · 49분 후` : s.memo || `${s.cls} 수업 시작 후 ${elapsed(s)} 지남`}{s.st === 'offline' && <div className="acts"><Button onClick={() => onAction('absent', s.id)}>결석 처리</Button><Button onClick={() => onCopy(phone(s, true))}>학부모 연락처 복사</Button></div>}</div>}</div>
@@ -83,7 +83,7 @@ export function StudentFoot({ student: s, onAction }) {
 }
 
 /* ← → 문항 이동, F 따라가기. active 가 거짓이면(뒤쪽 창) 무시한다. */
-export function useQuestionKeys(student, q, setQuestion, active = true) {
+export function useQuestionKeys(student, q, setQuestion, active = true, onLink) {
   useEffect(() => {
     if (!active) return;
     const keydown = e => {
@@ -91,7 +91,8 @@ export function useQuestionKeys(student, q, setQuestion, active = true) {
       if (e.key === 'ArrowLeft') { e.preventDefault(); setQuestion(Math.max(1, q - 1)); }
       if (e.key === 'ArrowRight') { e.preventDefault(); setQuestion(Math.min(student.total, q + 1)); }
       if (e.key.toLowerCase() === 'f') setQuestion(null);
+      if (e.key.toLowerCase() === 's' && onLink) { e.preventDefault(); onLink(); }
     };
     window.addEventListener('keydown', keydown); return () => window.removeEventListener('keydown', keydown);
-  }, [q, student.total, setQuestion, active]);
+  }, [q, student.total, setQuestion, active, onLink]);
 }

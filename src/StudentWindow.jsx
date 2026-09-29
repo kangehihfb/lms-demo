@@ -8,7 +8,7 @@ import { useFloatingWindow, useNarrow } from './windowing.js';
  * 원본의 openWin(sid) 에 해당하는 독립 학생 창.
  * 보드와 별개로 여러 개를 띄워 끌고 크기를 바꿀 수 있다.
  */
-export default function StudentWindow({ state, dispatch, sid, initial, z, active, onFocus, onClose, onAction, notify, onCopy }) {
+export default function StudentWindow({ state, dispatch, sid, initial, z, active, onFocus, onClose, onAction, notify, onCopy, onMenu }) {
   const s = state.students.find(student => student.id === sid);
   const ref = useRef(null);
   const [question, setQuestion] = useState(null);
@@ -18,7 +18,7 @@ export default function StudentWindow({ state, dispatch, sid, initial, z, active
   const { narrow } = useNarrow(ref, 980);
   const q = question ?? (s.cur || 1);
   const hasScreen = !['pre', 'offline', 'absent'].includes(s.st);
-  useQuestionKeys(s, q, setQuestion, active);
+  useQuestionKeys(s, q, setQuestion, active, () => onCopy(`https://lms.mildang.kr/student/${s.id}?q=${q}`));
 
   return <section
     ref={ref}
@@ -39,7 +39,7 @@ export default function StudentWindow({ state, dispatch, sid, initial, z, active
       </div>
     </div>
     <div className="sw-body">
-      <StudentScreen student={s} alerts={state.alerts} q={q} setQuestion={setQuestion} explanation={explanation} setExplanation={setExplanation} dispatch={dispatch} notify={notify} onAction={onAction} onCopy={onCopy}/>
+      <StudentScreen student={s} alerts={state.alerts} q={q} setQuestion={setQuestion} explanation={explanation} setExplanation={setExplanation} dispatch={dispatch} notify={notify} onAction={onAction} onCopy={onCopy} onMenu={onMenu}/>
       <StudentSide student={s} side={side} setSide={setSide} dispatch={dispatch} notify={notify} onAction={onAction}/>
     </div>
     <StudentFoot student={s} onAction={onAction}/>
