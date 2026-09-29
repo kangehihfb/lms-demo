@@ -1,6 +1,6 @@
 import { lazy, Suspense, useCallback, useEffect, useReducer, useRef, useState } from 'react';
 import { CLS, STXT } from './data.js';
-import { STORAGE_KEY, ROUTES, loadState, reducer, clsState, scopedStudents, sortedAlerts, exportCsv, needOrder, workspaceOrder } from './model.js';
+import { STORAGE_KEY, ROUTES, loadState, reducer, clsState, scopedStudents, sortedAlerts, exportCsv, needOrder, workspaceOrder, EVENTS } from './model.js';
 import { Icon, IconButton, Button, Modal, SeverityIcon, WindowTitle } from './components.jsx';
 import Board from './Board.jsx';
 import StudentWorkspace from './StudentWorkspace.jsx';
@@ -9,6 +9,7 @@ import ActionDialog from './ActionDialog.jsx';
 import FeedWizard from './FeedWizard.jsx';
 import StudentWindow from './StudentWindow.jsx';
 import QuickChat from './QuickChat.jsx';
+import Notifications from './Notifications.jsx';
 import { useFloatingWindow, useNarrow, useZOrder, snapGeometry, compactGeometry, cascadeGeometry } from './windowing.js';
 
 const StudentsPage = lazy(() => import('./Management.jsx').then(m => ({ default: m.StudentsPage })));
@@ -46,7 +47,7 @@ export default function App() {
   const student = useFloatingWindow({ minW: 640, minH: 420, onInteract: () => focus('student') });
   const { narrow: boardNarrow } = useNarrow(boardRef, 1100);
   const [mini, setMini] = useState(false); const [palette, setPalette] = useState(false); const [settings, setSettings] = useState(null); const [action, setAction] = useState(null); const [menu, setMenu] = useState(null);
-  const [message, setMessage] = useState(''); const [storageError, setStorageError] = useState(false); const [quick, setQuick] = useState(null);
+  const [message, setMessage] = useState(''); const [storageError, setStorageError] = useState(false); const [quick, setQuick] = useState(null); const [toasts, setToasts] = useState([]);
   const messageTimer = useRef(null);
   const notify = useCallback(text => { setMessage(text); clearTimeout(messageTimer.current); messageTimer.current = setTimeout(() => setMessage(''), 4000); }, []);
   useEffect(() => () => clearTimeout(messageTimer.current), []);
@@ -75,6 +76,16 @@ export default function App() {
   };
   /* 보드 카드 옆에 붙는 빠른 답장. 같은 학생을 다시 누르거나 id 가 null 이면 닫는다. */
   const openQuickChat = (id, rect) => setQuick(current => id == null || current?.id === id ? null : { id, rect: rect ?? current?.rect });
+  /* 앱을 보고 있으면 상태 표시줄로만 알리고, 아니면 OS 알림을 띄운다 (원본 appInView). */
+  const appInView = () => !hidden && front === 'main' || front === 'student' && studentVisible;
+  const incoming = (event, force = false) => {
+    const id = `e${Math.random().toString(36).slice(2, 7)}`;
+    dispatch({ type: 'incoming', event, id });
+    const s = state.students.find(x => x.id === event.sid);
+    if (!force && appInView()) { notify(`${s.name} · ${event.text} → 처리 대기에 추가 (앱을 보고 있어서 알림은 안 띄움)`); return; }
+    setToasts(list => [...list, { id, sid: event.sid, sev: event.sev, body: event.msg || event.text }]);
+  };
+  const closeToast = id => setToasts(list => list.filter(t => t.id !== id));
   const openSettings = tab => { setSettings(tab); focus('settings'); setMenu(null); };
   const closeWindow = id => { setWindows(list => list.filter(w => w.sid !== id)); focus('main'); };
   const setMode = kind => {
@@ -145,6 +156,14 @@ export default function App() {
     };
     window.addEventListener('keydown', listener); return () => window.removeEventListener('keydown', listener);
   });
+  const fired = useRef(false);
+  useEffect(() => {
+    if (fired.current) return; /* StrictMode 이중 실행 방지 */
+    fired.current = true;
+    const timers = EVENTS.map(event => setTimeout(() => incomingRef.current(event), event.t * 1000));
+    return () => timers.forEach(clearTimeout);
+  }, []);
+  const incomingRef = useRef(null); incomingRef.current = incoming;
   useEffect(() => { const narrow = matchMedia('(max-width:760px)'); const apply = e => setSidebar(!e.matches); narrow.addEventListener('change', apply); return () => narrow.removeEventListener('change', apply); }, []);
   useEffect(() => { if (!menu) return; const close = e => { if (!e.target.closest('.menu,.mb-item')) setMenu(null); }; document.addEventListener('pointerdown', close); return () => document.removeEventListener('pointerdown', close); }, [menu]);
   const studentMenu = (id, x, y) => { const s = state.students.find(s => s.id === id); setSelected(id); setMenu({ x, y, items: [{ label: `${s.name} · ${STXT[s.st]}`, heading: true }, { label: '열기', run: () => openStudent(id) }, { label: '새 창으로 열기', run: () => openWindow(id) }, { label: '빠른 답장  C', run: () => openQuickChat(id, document.querySelector(`.srow.sel`)?.getBoundingClientRect()) }, { label: '학생 상세 보기', run: () => onAction('profile', id) }, { label: '메모 추가…', run: () => onAction('memo', id) }, { label: '피드 발송…', run: () => onAction('feed', id) }, { label: '결석 처리', disabled: s.st !== 'offline', run: () => onAction('absent', id) }, { label: '수업 종료', disabled: ['ended', 'absent', 'pre'].includes(s.st), run: () => onAction('end', id) }] }); };
@@ -157,7 +176,7 @@ export default function App() {
       view: [{ label: '지금 수업', run: () => setScope('now') }, { label: '오늘 전체', run: () => setScope('today') }, ...[['time', '수업 시간별 묶기'], ['status', '상태별 묶기'], ['none', '묶기 없음']].map(([group, label]) => ({ label, run: () => setOptions(o => ({ ...o, group })) })), { label: '카드로 보기', run: () => setOptions(o => ({ ...o, view: 'card' })) }, { label: '표로 보기', run: () => setOptions(o => ({ ...o, view: 'table' })) }, { label: '사이드바 열기/닫기', run: () => setSidebar(!sidebar) }, { label: '주간 · 야간', run: toggleTheme }],
       student: [{ label: '다음 확인 필요 학생', run: nextStudent }, { label: '학생 찾기', run: () => setPalette(true) }, { label: '피드 발송', run: () => onAction('feed', selected) }],
       window: [{ label: '미니 창 열기/닫기', run: () => setMini(!mini) }, { label: '보드 창', run: () => { setHidden(false); setStudentVisible(false); focus('main'); } }, { label: '학생 상세 창', disabled: active == null, run: () => { setStudentVisible(true); focus('student'); } }, { label: '나란히 보기 (보드 | 학생)', disabled: active == null, run: () => { setHidden(false); setStudentVisible(true); snapSide(); focus('student'); } }, { label: '보드 창 최대화', run: () => { setHidden(false); board.maximize(); focus('main'); } }, { label: `${selected != null ? state.students.find(x => x.id === selected).name : '선택한 학생'}을 새 창으로`, disabled: selected == null, run: () => openWindow(selected) }, ...(windows.length ? [{ label: '열린 학생 창', heading: true }, ...windows.map(w => ({ label: `${state.students.find(x => x.id === w.sid).name} · ${state.students.find(x => x.id === w.sid).cls}반`, run: () => focus(`w${w.sid}`) })), { label: '학생 창 모두 닫기', run: () => { setWindows([]); focus('main'); } }] : [])],
-      help: [{ label: '키보드 단축키', run: () => openSettings('keys') }, { label: '밀당 LMS 도움말', run: () => onAction('help') }, { label: '새 채팅 시뮬레이션', run: () => { dispatch({ type: 'simulate' }); notify('최지우의 새 채팅을 추가했습니다'); } }],
+      help: [{ label: '키보드 단축키', run: () => openSettings('keys') }, { label: '밀당 LMS 도움말', run: () => onAction('help') }, { label: '새 채팅 시뮬레이션', run: () => incoming({ sid: 3, kind: 'chat', sev: 'caution', text: '새 채팅 1건', msg: '쌤 8번 답이 2번 맞아요?' }, true) }],
     };
     setMenu({ key, x: r.left, y: r.bottom + 2, items: items[key] });
   };
@@ -177,6 +196,8 @@ export default function App() {
     {windows.map(w => <StudentWindow key={w.sid} state={state} dispatch={dispatch} sid={w.sid} initial={w.geom} z={z[`w${w.sid}`]} active={front === `w${w.sid}`} onFocus={() => focus(`w${w.sid}`)} onClose={() => closeWindow(w.sid)} onAction={onAction} notify={notify} onCopy={copy}/>)}
     {mini && <section className="mini on" aria-label="처리 대기 미니 창"><div className="mini-t"><div className="appic-s">밀</div>처리 대기<span className="pin">데모</span><span className="sp"/><button className="cap" aria-label="미니 창 닫기" onClick={() => setMini(false)}><Icon name="close"/></button></div><div className="mini-c">{['alarm', 'warning', 'caution'].map(sev => <span key={sev} className="num"><SeverityIcon severity={sev}/>{count(sev)}</span>)}</div><div className="mini-l">{todo.map(a => <button className="mini-r" key={a.id} onClick={() => openStudent(a.sid)}><SeverityIcon severity={a.sev}/><span className="d"><b>{state.students.find(s => s.id === a.sid).name}</b> {a.text}</span></button>)}{!todo.length && <div className="empty">할 일 없음</div>}</div><div className="mini-f">{todo.length ? `처리 대기 ${todo.length}건 · 누르면 화면 + 채팅` : '학생을 누르면 화면 + 채팅'}</div></section>}
     {settings && <Settings key={settings} state={state} dispatch={dispatch} onClose={() => { setSettings(null); focus('main'); }} notify={notify} onAction={onAction} initialTab={settings} setMode={setMode} z={z.settings} active={front === 'settings'} onFocus={() => focus('settings')}/>}
+    <Notifications state={state} items={toasts} onOpen={openStudent} onClose={closeToast}
+      onReply={(sid, text) => { dispatch({ type: 'respond', id: sid, text }); notify(`${state.students.find(x => x.id === sid).name}에게 답장했습니다 (데모)`); }}/>
   </main>
   <footer className="taskbar" aria-label="데모 작업 표시줄"><div className="tb-center"><button className="tk" title="앱 메뉴" aria-label="앱 메뉴" onClick={() => setPalette(true)}><span className="windows-mark"><i/><i/><i/><i/></span></button><button className="tk-search" onClick={() => setPalette(true)}><Icon name="find"/>검색</button><span className="tk decorative-app" title="파일 탐색기 (장식)"><Icon name="folder" size={22}/></span><span className="tk decorative-app browser-mark" title="브라우저 (장식)"><i/></span><button className="tk on" title="밀당 LMS" aria-label="밀당 LMS 창 복원" onClick={() => { setHidden(false); if (active != null) setStudentVisible(value => !value); }}><span className="tk-app">밀</span>{todo.length > 0 && <span className="tk-bd num">{todo.length}</span>}</button>{windows.map(w => { const st = state.students.find(x => x.id === w.sid); return <button key={w.sid} className={`tk ${front === `w${w.sid}` ? 'on' : ''}`} title={`${st.name} 학생 창`} aria-label={`${st.name} 학생 창으로 전환`} onClick={() => focus(`w${w.sid}`)}><span className="tk-app">{st.name.slice(-2)}</span></button>; })}<span className="tk decorative-app" title="메신저 (장식)"><span className="messenger-mark"><Icon name="chat" size={19}/></span></span></div><div className="tray"><button className="tr-i tr-lms" aria-label="처리 대기 보기" onClick={() => setMini(!mini)}>{['alarm', 'warning'].filter(sev => count(sev)).map(sev => <span className="tray-severity" key={sev}><SeverityIcon severity={sev}/><span className="num">{count(sev)}</span></span>)}</button><span className="tr-i system-icons"><Icon name="wifi"/><Icon name="volume"/></span><div className="tr-clock">오후 8:41<br/>2026-09-28</div></div></footer>
   {menu && <div className="menu" role="menu" style={{ left: Math.max(4, Math.min(menu.x, innerWidth - 240)), top: Math.max(4, Math.min(menu.y, innerHeight - menu.items.length * 30 - 20)) }}>{menu.items.map((item, i) => item.heading ? <div className="mh" key={i}>{item.label}</div> : <button role="menuitem" className="mi" key={i} disabled={item.disabled} onClick={() => { setMenu(null); item.run(); }}>{item.label}</button>)}</div>}

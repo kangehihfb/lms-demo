@@ -98,3 +98,7 @@ button{text-align:inherit}
 
 /* 처리 대기 목록은 잘라내지 말고 넘치면 스크롤한다 */
 .mini-l{max-height:232px;overflow-y:auto}
+
+/* 알림 토스트는 flex 아이템으로 눌리면 안 되고,
+   슬라이드인용 .in 클래스가 무관한 .in{height:28px} 규칙과 겹쳐 높이가 잘린다. */
+.notifs .nt{flex:none;height:auto}

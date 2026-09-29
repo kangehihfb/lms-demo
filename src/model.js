@@ -23,6 +23,21 @@ export function reducer(state, action) {
     case 'theme': return { ...state, theme: action.theme };
     case 'preference': return { ...state, preferences: { ...state.preferences, [action.key]: action.value } };
     case 'report': return { ...state, reports: { ...state.reports, [action.id]: action.report } };
+    /* 원본 incoming(ev): 학생 상태와 알림을 갱신한다. 같은 종류의 채팅은 건수만 올린다. */
+    case 'incoming': {
+      const { sid, msg, cur, kind, sev, text } = action.event;
+      const students = state.students.map(s => s.id === sid ? {
+        ...s,
+        last: msg ? msg : s.last,
+        extra: msg ? [...(s.extra || []), { text: msg, at: NOW0.toISOString() }] : s.extra,
+        cur: cur ?? s.cur,
+      } : s);
+      const open = state.alerts.find(a => a.sid === sid && a.kind === kind && !a.waitAt);
+      const alerts = open && kind === 'chat'
+        ? state.alerts.map(a => a.id === open.id ? { ...a, n: (a.n || 1) + 1, text: `새 채팅 ${(a.n || 1) + 1}건` } : a)
+        : [...state.alerts, { id: action.id, sid, sev, kind, n: 1, text, at: NOW0.toISOString() }];
+      return { ...state, students, alerts };
+    }
     case 'simulate': {
       const id = 3;
       return { ...state, students: state.students.map(s => s.id === id ? { ...s, last: '쌤 8번 답이 2번 맞아요?', extra: [...(s.extra || []), { text: '쌤 8번 답이 2번 맞아요?', at: NOW0.toISOString() }] } : s), alerts: [...state.alerts.filter(a => a.id !== 'demo-chat'), { id: 'demo-chat', sid: id, sev: 'caution', kind: 'chat', text: '새 채팅 1건', n: 1, at: NOW0.toISOString() }] };
@@ -85,3 +100,12 @@ export function exportCsv(filename, rows) {
   const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }));
   const link = document.createElement('a'); link.href = url; link.download = filename; link.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
+
+/** 데모가 켜진 뒤 예약된 수신 이벤트 (원본 EVENTS). t 는 초. */
+export const EVENTS = [
+  { t: 6, sid: 3, kind: 'chat', sev: 'caution', text: '새 채팅 1건', msg: '쌤 8번 답이 2번 맞아요?' },
+  { t: 18, sid: 5, kind: 'chat', sev: 'caution', text: '새 채팅 1건', msg: '다 풀었어요! 다음 거 해요?' },
+  { t: 30, sid: 10, kind: 'stuck', sev: 'alarm', text: '3번 문항에서 10분째 멈춤' },
+  { t: 42, sid: 12, kind: 'chat', sev: 'caution', text: '새 채팅 1건', msg: '이거 사진으로 보낼게요' },
+  { t: 55, sid: 7, kind: 'chat', sev: 'caution', text: '새 채팅 1건', msg: '쌤 잠깐 화장실 다녀올게요' },
+];
