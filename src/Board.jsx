@@ -1,0 +1,39 @@
+import { Fragment } from 'react';
+import { CLS, SGROUP, STXT } from './data.js';
+import { boardGroups, clsState, scopedStudents, topAlert, needsAttention, tagFor, elapsed } from './model.js';
+import { Icon, SeverityIcon, Progress, SearchField, SelectField, Segmented } from './components.jsx';
+
+export function StudentCard({ student: s, alerts, selected, showClass, onSelect, onOpen, onContext, onQuickChat, quickOpen }) {
+  const top = topAlert(alerts, s.id);
+  const count = alerts.filter(a => a.sid === s.id && a.kind === 'chat').reduce((n, a) => n + (a.n || 1), 0);
+  const fin = SGROUP[s.st] === 'fin' || s.st === 'absent';
+  const tag = tagFor(s, top);
+  const label = [s.name, `${s.cls}반`, tag || STXT[s.st], count > 0 && `새 채팅 ${count}건`, s.unit,
+    !['pre', 'absent', 'offline'].includes(s.st) && `진행 ${s.cur}/${s.total}`].filter(Boolean).join(', ');
+  return <div role="button" tabIndex={0} aria-label={label} aria-pressed={selected} className={`srow ${top ? top.waitAt ? 'waiting' : `s-${top.sev}` : ''} ${fin ? 'fin' : ''} ${selected ? 'sel' : ''} ${quickOpen ? 'qopen' : ''}`} onClick={e => { onSelect(s.id); onQuickChat(s.id, e.currentTarget.getBoundingClientRect()); }} onDoubleClick={e => { onQuickChat(null); onOpen(s.id); e.currentTarget.blur(); }} onKeyDown={e => { if (e.key === 'Enter') { e.stopPropagation(); onOpen(s.id); } if (e.key === ' ') { e.preventDefault(); onSelect(s.id); } }} onContextMenu={e => { e.preventDefault(); onSelect(s.id); onContext(s.id, e.clientX, e.clientY); }}>
+    <div>{top ? <SeverityIcon severity={top.sev}/> : <span className={`dotn ${s.st === 'live' ? 'on' : ''}`}/>}</div>
+    <div className="nm">{s.name}{showClass && <small>{s.cls}</small>}{tag && <em>{tag}</em>}{count > 0 && <button className="chatn num" aria-label={`${s.name} 새 채팅 ${count}건 · 빠른 답장`} onClick={e => { e.stopPropagation(); onSelect(s.id); onQuickChat(s.id, e.currentTarget.closest('.srow').getBoundingClientRect()); }}>{count}</button>}</div>
+    <span className="el num">{elapsed(s)}</span>
+    <div className="unit">{count && s.st !== 'live' ? `💬 ${s.last}` : s.memo && fin ? `📌 ${s.memo}` : s.unit}</div>
+    {!['pre', 'absent', 'offline'].includes(s.st) && <div className="bar"><Progress student={s}/><span className="pv num">{s.cur}/{s.total}</span></div>}
+  </div>;
+}
+export default function Board({ state, options, setOptions, selected, onSelect, onOpen, onContext, onQuickChat, quickId }) {
+  const change = patch => setOptions(o => ({ ...o, ...patch }));
+  const scoped = scopedStudents(state.students, options.scope);
+  const list = scoped.filter(s => s.name.includes(options.query));
+  const count = key => key === 'all' ? list.length : key === 'need' ? list.filter(s => needsAttention(state.alerts, s.id)).length : list.filter(s => SGROUP[s.st] === key).length;
+  const outside = state.students.filter(s => !scoped.includes(s) && needsAttention(state.alerts, s.id));
+  const active = list.filter(s => ['live', 'done', 'ended'].includes(s.st));
+  const average = Math.round(active.reduce((n, s) => n + s.cur / s.total, 0) / Math.max(1, active.length) * 100);
+  const groups = boardGroups(state.students, state.alerts, options);
+  const showClass = options.group !== 'time' || options.filter === 'need';
+  const cards = students => students.map(s => <StudentCard key={s.id} student={s} alerts={state.alerts} selected={selected === s.id} showClass={showClass} onSelect={onSelect} onOpen={onOpen} onQuickChat={onQuickChat} quickOpen={quickId === s.id} onContext={onContext}/>);
+  return <>
+    <div className="scopebar" role="group" aria-label="학생 상태 필터">{[['all', '전체'], ['need', '확인 필요'], ['live', '수업 중'], ['off', '미접속 · 결석'], ['pre', '수업 전'], ['fin', '끝남']].map(([key, label]) => <button key={key} className={`stab ${options.filter === key ? 'on' : ''} ${['need', 'off'].includes(key) && list.some(s => state.alerts.some(a => a.sid === s.id && !a.waitAt && a.sev === 'alarm')) ? 'alarm' : ''}`} aria-pressed={options.filter === key} onClick={() => change({ filter: key })}><span className="l">{label}</span><span className="v num">{count(key)}</span></button>)}<div className="scope-r">{outside.length > 0 && <button className="outchip" onClick={() => onOpen(outside[0].id)}>다른 반 {outside.length}건 · {outside[0].name}</button>}<span>평균 진행 <b className="num">{average}%</b></span><span>다음 수업 <b>21:30</b> · <span className="num">49분 후</span></span></div></div>
+    <div className="boardbar"><SelectField label="묶기" value={options.group} onChange={group => change({ group })} options={ [['time', '수업 시간'], ['status', '상태'], ['none', '없음']] }/><SelectField label="정렬" value={options.sort} onChange={sort => change({ sort })} options={ [['alert', '확인 필요 먼저'], ['name', '이름'], ['progress', '진행 낮은 순'], ['cls', '반']] }/><Segmented label="보드 보기" value={options.view} onChange={view => change({ view })} options={ [['card', '카드', 'card'], ['table', '표', 'table']] }/><span className="sp"/><SearchField value={options.query} onChange={query => change({ query })} placeholder="이 보드에서 이름 찾기"/></div>
+    <div className="bbody">
+      {!groups.some(g => g.students.length) ? <div className="empty">조건에 맞는 학생이 없습니다</div> : options.view === 'table' ? <div className="table-scroll"><table className="tbl"><colgroup>{[28, 140, 64, 96, null, 170, 84, 52].map((width, i) => <col key={i} style={width ? { width } : undefined}/>)}</colgroup><thead><tr>{[['', ''], ['이름', 'name'], ['반', 'cls'], ['상태', ''], ['현재 유닛', ''], ['진행', 'progress'], ['경과', ''], ['채팅', '']].map(([name, sort], i) => <th key={i} scope="col">{sort ? <button onClick={() => change({ sort })}>{name}{options.sort === sort && ' ▲'}</button> : name}</th>)}</tr></thead><tbody>{groups.map(g => <Fragment key={g.key}>{g.title && <tr className="gh"><td colSpan={8}>{g.title} · {g.students.length}명{options.group === 'time' && ` · ${CLS[g.key].range}`}</td></tr>}{g.students.map(s => { const top = topAlert(state.alerts, s.id); const chat = state.alerts.filter(a => a.sid === s.id && a.kind === 'chat').reduce((n, a) => n + (a.n || 1), 0); return <tr key={s.id} tabIndex={0} className={`${top ? top.waitAt ? 'waiting' : `s-${top.sev}` : ''} ${selected === s.id ? 'sel' : ''}`} onClick={() => onSelect(s.id)} onDoubleClick={() => onOpen(s.id)} onKeyDown={e => { if (e.key === 'Enter') { e.stopPropagation(); onOpen(s.id); } }} onContextMenu={e => { e.preventDefault(); onContext(s.id, e.clientX, e.clientY); }}><td>{top ? <SeverityIcon severity={top.sev}/> : <span className={`dotn ${s.st === 'live' ? 'on' : ''}`}/>}</td><td className="nm"><button onClick={() => onOpen(s.id)}>{s.name}</button></td><td className="mut num">{s.cls}</td><td className="tg">{tagFor(s, top) || STXT[s.st]}</td><td className="mut">{s.unit}</td><td>{['pre', 'absent', 'offline'].includes(s.st) ? '—' : <div className="table-progress"><Progress student={s}/><span className="mut num">{s.cur}/{s.total}</span></div>}</td><td className="mut num">{elapsed(s)}</td><td>{chat > 0 && <span className="chatn num">{chat}</span>}</td></tr>; })}</Fragment>)}</tbody></table></div> : options.group === 'none' || options.filter === 'need' ? <div className="tiles">{cards(groups[0].students)}</div> : <div className="lanes">{groups.map(g => <section className={`lane ${options.group === 'time' && clsState(g.key) === 'past' ? 'past' : ''}`} key={g.key} aria-label={g.title}><div className="lane-h"><b>{g.title}</b><span className="st num">{options.group === 'time' && `${CLS[g.key].range} · `}{g.students.length}명</span>{options.group === 'time' && <span className={`live ${clsState(g.key) !== 'live' ? 'off' : ''}`}><span className="gdot"/>{clsState(g.key) === 'past' ? '종료' : clsState(g.key) === 'pre' ? '49분 후 시작' : `수업 중 ${g.students.filter(s => s.st === 'live').length}`}</span>}</div><div className="lane-b">{g.students.length ? cards(g.students) : <div className="lane-e">없음</div>}</div></section>)}</div>}
+    </div>
+  </>;
+}
